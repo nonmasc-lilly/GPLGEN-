@@ -19,137 +19,155 @@
 #include <errno.h>
 #include "gpl.h"
 
-void gplp_str_to_uint(const char *str, uint32_t *ret, uint32_t *error_code) {
+GPLP_ERROR_CODE gplp_gpl_str_convert_to_uint(const char *str, uint32_t *ret) {
         char *eptr;
-        *error_code = 0;
         switch(*str) {
         case 'b':
                 *ret = strtol(str+1, &eptr, 0x02);
-                if(*str && !*eptr) return;
+                if(*str && !*eptr) return GPLP_SUCCESS;
                 break;
         case '$':
                 *ret = strtol(str+1, &eptr, 0x10);
-                if(*str && !*eptr) return;
+                if(*str && !*eptr) return GPLP_SUCCESS;
                 break;
         default:
                 *ret = strtol(str, &eptr, 0xA);
-                if(*str && !*eptr) return;
+                if(*str && !*eptr) return GPLP_SUCCESS;
                 break;
         }
-        *error_code = 1;
-        return;
+        return GPLP_NONDESCRIPT_FAILURE;
 }
 
-void gplp_generate_license_file(const char *path) {
+GPLP_ERROR_CODE gplp_gpl_license_file_generate(const char *path) {
         FILE *fp;
         fp = fopen(path, "w");
         if(!fp) {
                 fprintf(stderr, "Error: Could not open %s\n", path);
-                return;
+                return GPLP_NONDESCRIPT_FAILURE;
         }
-        gplp_license_fprint_license(fp);
+        gplp_gpl_license_fprint(fp);
         fclose(fp);
+        return GPLP_SUCCESS;
 }
 
-void gplp_generate_file(
-                uint32_t argc,
-                char **argv,
-                uint32_t index,
-                GPLP_BOOLEAN prepend,
-                GPLP_BOOLEAN standout,
-                GPLP_LANGUAGE_TYPE_ENUM language) {
-        const char      *path,
-                        *project_name,
-                        *year_str,
-                        *author,
-                        *desc;
-        char            *file_content;
-        uint32_t        year,
-                        error_code,
-                        file_length;
-        FILE            *fp;
-        if(index+5 > argc) goto generic_error;
-        path            = argv[index+1];
-        project_name    = argv[index+2];
-        year_str        = argv[index+3];
-        author          = argv[index+4];
-        desc            = argv[index+5];
-        gplp_str_to_uint(year_str, &year, &error_code);
-        if(error_code) {
+/* TODO: abstract into two functions
+ * gplp_gpl_file_generate_from_args
+ * gplp_gpl_file_generate_from_data
+ *
+ * in order to abstract gplp_config_file_generate
+*/
+GPLP_ERROR_CODE gplp_gpl_file_generate_from_arguments(
+                const char *path,
+                const char *project_name,
+                const char *year_str,
+                const char *author,
+                const char *desc,
+                GPLP_BOOLEAN_T prepend,
+                GPLP_BOOLEAN_T standout,
+                GPLP_GPL_LANGUAGE_ENUM language) {
+        GPLP_GPL_PROJECT_DATA project_data;
+        project_data.project_name = malloc(strlen(project_name)+1);
+        strcpy(project_data.project_name, project_name);
+        project_data.author = malloc(strlen(author)+1);
+        strcpy(project_data.author, author);
+        project_data.description = malloc(strlen(desc)+1);
+        strcpy(project_data.description, desc);
+        project_data.prepend = prepend;
+        project_data.standout = standout;
+        if(gplp_gpl_str_convert_to_uint(year_str, &project_data.year)) {
                 fprintf(stderr, "Error: invalid integer \"%s\"", year_str);
-                goto generic_error;
+                return GPLP_NONDESCRIPT_FAILURE;
         }
-        if(standout) {
-                fp = fopen(path, "r");
-                if(!fp && errno != ENOENT) {
-                        fprintf(stderr, "Error: Could not open \"%s\" for reading (in order to standout)\n");
-                        goto generic_error;
-                } else if(fp) {
-                        fseek(fp, 0L, SEEK_END);
-                        file_length = ftell(fp);
-                        fseek(fp, 0L, SEEK_SET);
-                        file_content = calloc(1,file_length+1);
-                        fread(file_content, 1, file_length, fp);
-                        fclose(fp);
-                        printf("%s\n", file_content);
-                        free(file_content);
+        return gplp_gpl_file_generate_from_structure(path, project_data, language);
+}
+
+GPLP_ERROR_CODE gplp_gpl_file_generate_from_structure(
+                const char *path,
+                GPLP_GPL_PROJECT_DATA project_data,
+                GPLP_GPL_LANGUAGE_ENUM language) {
+        struct {
+                uint32_t length;
+                FILE *pointer;
+                char *content;
+        } file;
+        file.content = NULL;
+        if(project_data.standout || project_data.prepend) {
+                file.pointer = fopen(path, "r");
+                if(!file.pointer && errno != ENOENT) {
+                        fprintf(stderr, "Error: Could not open \"%s\" for reading (in order to standout)\n", path);
+                        return GPLP_NONDESCRIPT_FAILURE;
+                } else if(file.pointer) {
+                        fseek(file.pointer, 0L, SEEK_END);
+                        file.length = ftell(file.pointer);
+                        fseek(file.pointer, 0L, SEEK_SET);
+                        file.content = calloc(1,file.length+1);
+                        fread(file.content, 1, file.length, file.pointer);
+                        fclose(file.pointer);
+                        if(project_data.standout)
+                                printf("%s\n", file.content);
                 }
         }
-        fp = fopen(path, "w");
-        if(!fp) {
+        file.pointer = fopen(path, "w");
+        if(!file.pointer) {
                 fprintf(stderr, "Error: Could not open \"%s\"\n", path);
-                goto generic_error;
+                return GPLP_NONDESCRIPT_FAILURE;
         }
-        printf("he\n");
-        gplp_write_header(fp, language, project_name, desc, year, author);
-        printf("he\n");
-        fclose(fp);
-        return;
-
-generic_error:
-        fprintf(stderr, "Error: Usage of -G is as follows:\n"
-                        "  -G <path> <project name> <year> <author> <description>\n");
-        return;
+        gplp_gpl_header_write(language, project_data.project_name, project_data.description, project_data.year, project_data.author, file.pointer);
+        fclose(file.pointer);
+        if(file.content && project_data.prepend) {
+                file.pointer = fopen(path, "a");
+                fprintf(file.pointer, file.content);
+                fclose(file.pointer);
+        }
+        return GPLP_SUCCESS;
 }
 
-void gplp_write_header(
-                FILE *file,
-                GPLP_LANGUAGE_TYPE_ENUM language,
+void gplp_gpl_header_write(
+                GPLP_GPL_LANGUAGE_ENUM language,
                 const char *project_name,
                 const char *description,
                 uint32_t    year,
-                const char *author) {
+                const char *author,
+                FILE *file) {
 
-        fprintf(file, GPLP_HEADER_FORMAT_STRING,
-                GPLP_LANGUAGE_COMMENT_BEGIN_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
+        fprintf(
+                file,
+                GPLP_GPL_FORMAT_STRING_VAR,
+                GPLP_GPL_LANGUAGE_COMMENT_BEGIN_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
                 project_name,
                 description,
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
                 year,
                 author,
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_STR[language],
-                GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[language],
-                GPLP_LANGUAGE_COMMENT_END_STR[language]
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[language],
+                GPLP_GPL_LANGUAGE_COMMENT_END_STRING_VAR[language]
         );
+}
+
+void gplp_gpl_project_data_destroy(GPLP_GPL_PROJECT_DATA *project_data) {
+        free(project_data->project_name);
+        free(project_data->author);
+        free(project_data->description);
 }

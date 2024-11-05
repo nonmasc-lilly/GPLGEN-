@@ -13,12 +13,17 @@
 *            along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#ifndef X__GPLGENP_MAIN__X
-#define X__GPLGENP_MAIN__X
-#include <stdio.h>
-#include "license.h"
+#ifndef X__GPLP_GPL_H__X
+#define X__GPLP_GPL_H__X
+#include "defs.h"
 
-static const char *GPLP_HEADER_FORMAT_STRING =
+typedef struct {
+        GPLP_BOOLEAN_T prepend, standout;
+        uint32_t year;
+        char *project_name, *author, *description;
+} GPLP_GPL_PROJECT_DATA;
+
+static const char *GPLP_GPL_FORMAT_STRING_VAR =
         "%s\n"
         "%s  %s, %s%s\n"
         "%s  Copyright (C) %d %s%s\n"
@@ -34,25 +39,22 @@ static const char *GPLP_HEADER_FORMAT_STRING =
         "%s          along with this program. If not, see <https://www.gnu.org/licenses>.%s\n"
         "%s\n";
 
-typedef uint8_t GPLP_BOOLEAN;
-#define GPLP_TRUE  1
-#define GPLP_FALSE 0
-typedef uint8_t GPLP_LANGUAGE_TYPE_ENUM; enum {
-        GPLP_LANGUAGE_TYPE_ADA,
-        GPLP_LANGUAGE_TYPE_ABAP,
-        GPLP_LANGUAGE_TYPE_ABC,
-        GPLP_LANGUAGE_TYPE_ASM,
-        GPLP_LANGUAGE_TYPE_ALGOL,
-        GPLP_LANGUAGE_TYPE_C,
-        GPLP_LANGUAGE_TYPE_CXX,
-        GPLP_LANGUAGE_TYPE_PYTHON,
-        GPLP_LANGUAGE_TYPE_HTML,
-        GPLP_LANGUAGE_TYPE_MARKDOWN,
-        GPLP_LANGUAGE_TYPE_VISUAL_BASIC,
-        GPLP_LANGUAGE_TYPE__MAX
+typedef uint8_t GPLP_GPL_LANGUAGE_ENUM; enum {
+        GPLP_GPL_LANGUAGE_ADA           =       0x00,
+        GPLP_GPL_LANGUAGE_ABAP          =       0x01,
+        GPLP_GPL_LANGUAGE_ABC           =       0x02,
+        GPLP_GPL_LANGUAGE_ASM           =       0x03,
+        GPLP_GPL_LANGUAGE_ALGOL         =       0x04,
+        GPLP_GPL_LANGUAGE_C             =       0x05,
+        GPLP_GPL_LANGUAGE_CXX           =       0x06,
+        GPLP_GPL_LANGUAGE_PYTHON        =       0x07,
+        GPLP_GPL_LANGUAGE_HTML          =       0x08,
+        GPLP_GPL_LANGUAGE_MARKDOWN      =       0x09,
+        GPLP_GPL_LANGUAGE_VISUAL_BASIC  =       0x0A,
+        GPLP_GPL_LANGUAGE__MAX
 };
 
-static const char *GPLP_LANGUAGE_TYPE_STR[GPLP_LANGUAGE_TYPE__MAX] = {
+static const char *GPLP_GPL_LANGUAGE_STRING_VAR[GPLP_GPL_LANGUAGE__MAX] = {
         "Ada",
         "ABAP",
         "ABC",
@@ -66,7 +68,7 @@ static const char *GPLP_LANGUAGE_TYPE_STR[GPLP_LANGUAGE_TYPE__MAX] = {
         "VB",
 };
 
-static const char *GPLP_LANGUAGE_COMMENT_BEGIN_STR[GPLP_LANGUAGE_TYPE__MAX] = {
+static const char *GPLP_GPL_LANGUAGE_COMMENT_BEGIN_STRING_VAR[GPLP_GPL_LANGUAGE__MAX] = {
         "--",           /*      Ada             */
         "*",            /*      ABAP            */
         "\\",           /*      ABC             */
@@ -79,7 +81,7 @@ static const char *GPLP_LANGUAGE_COMMENT_BEGIN_STR[GPLP_LANGUAGE_TYPE__MAX] = {
         "",             /*      Markdown        */
         "\""            /*      Visual Basic    */
 };
-static const char *GPLP_LANGUAGE_COMMENT_CONTINUE_STR[GPLP_LANGUAGE_TYPE__MAX] = {
+static const char *GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_STRING_VAR[GPLP_GPL_LANGUAGE__MAX] = {
         "--",           /*      Ada             */
         "*",            /*      ABAP            */
         "\\",           /*      ABC             */
@@ -92,7 +94,7 @@ static const char *GPLP_LANGUAGE_COMMENT_CONTINUE_STR[GPLP_LANGUAGE_TYPE__MAX] =
         "[//]: # (",    /*      Markdown        */
         "\""            /*      Visual Basic    */
 };
-static const char *GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[GPLP_LANGUAGE_TYPE__MAX] = {
+static const char *GPLP_GPL_LANGUAGE_COMMENT_CONTINUE_END_STRING_VAR[GPLP_GPL_LANGUAGE__MAX] = {
         "",             /*      Ada             */
         "",             /*      ABAP            */
         "",             /*      ABC             */
@@ -105,7 +107,7 @@ static const char *GPLP_LANGUAGE_COMMENT_CONTINUE_END_STR[GPLP_LANGUAGE_TYPE__MA
         ")",            /*      Markdown        */
         ""              /*      Visual Basic    */
 };
-static const char *GPLP_LANGUAGE_COMMENT_END_STR[GPLP_LANGUAGE_TYPE__MAX] = {
+static const char *GPLP_GPL_LANGUAGE_COMMENT_END_STRING_VAR[GPLP_GPL_LANGUAGE__MAX] = {
         "--",           /*      Ada             */
         "*",            /*      ABAP            */
         "\\",           /*      ABC             */
@@ -119,24 +121,41 @@ static const char *GPLP_LANGUAGE_COMMENT_END_STR[GPLP_LANGUAGE_TYPE__MAX] = {
         "\""            /*      Visual Basic    */
 };
 
-void gplp_write_header(
-        FILE *file,
-        GPLP_LANGUAGE_TYPE_ENUM language,
+void gplp_gpl_header_write(
+        GPLP_GPL_LANGUAGE_ENUM language,
         const char *project_name,
         const char *description,
         uint32_t    year,
-        const char *author
+        const char *author,
+        FILE *file
 );
 
-void gplp_str_to_uint(const char *str, uint32_t *ret, uint32_t *error_code);
-void gplp_generate_license_file(const char *path);
-void gplp_generate_file(
-        uint32_t argc,
-        char **argv,
-        uint32_t index,
-        GPLP_BOOLEAN prepend,
-        GPLP_BOOLEAN standout,
-        GPLP_LANGUAGE_TYPE_ENUM language
+GPLP_ERROR_CODE gplp_gpl_str_convert_to_uint(
+        const char *str,
+        uint32_t *ret
+);
+GPLP_ERROR_CODE gplp_gpl_license_file_generate(
+        const char *path
+);
+GPLP_ERROR_CODE gplp_gpl_file_generate_from_arguments(
+        const char *path,
+        const char *project_name,
+        const char *year_str,
+        const char *author,
+        const char *desc,
+        GPLP_BOOLEAN_T prepend,
+        GPLP_BOOLEAN_T standout,
+        GPLP_GPL_LANGUAGE_ENUM language
+);
+GPLP_ERROR_CODE gplp_gpl_file_generate_from_structure(
+        const char *path,
+        GPLP_GPL_PROJECT_DATA project_data,
+        GPLP_GPL_LANGUAGE_ENUM language
+);
+void gplp_gpl_project_data_destroy(GPLP_GPL_PROJECT_DATA *project_data);
+
+void gplp_gpl_license_fprint(
+        FILE *file
 );
 
 #endif

@@ -53,3 +53,19 @@ STRING   = DQUOTE *(VCHAR / SP) DQUOTE | *%x21-7E
 INTEGER  = *DIGIT | "$" *HEXDIG | "b" *BIT
 BOOLEAN  = "true" | "false"
 ```
+
+We may input our config file with the following syntax:
+
+```
+config    = *statement
+statement = *SP prim *SP [comment] *SP NL
+prim      = set
+set       = option *SP "=" *SP value
+option    = "project" | "author" | "year" | "description" | "prepend" | "standout"
+value     = STRING | INTEGER | BOOLEAN
+comment   = ";" *(VCHAR | SP)
+
+STRING  = DQUOTE *(VCHAR | SP) DQUOTE | *%x21-7E
+INTEGER = *DIGIT | "$" *HEXDIG | "b" *BIT
+BOOLEAN = "true" | "false"
+```
