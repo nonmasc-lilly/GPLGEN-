@@ -25,3 +25,11 @@ build/license.o: src/license.c src/gpl.h
 
 build/config.o: src/config.c src/config.h src/gpl.h
 	$(CC) $(CFLAGS) -c src/config.c -o build/config.o
+
+ifeq ($(PLATFORM),"Linux")
+install: build/gplgp
+	cp build/gplgp /usr/bin/gplgp
+else
+install:
+	echo "install unsupported"
+endif
