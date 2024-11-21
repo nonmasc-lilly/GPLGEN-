@@ -58,7 +58,7 @@ static const char *GPLP_GPL_LANGUAGE_STRING_VAR[GPLP_GPL_LANGUAGE__MAX] = {
         "Ada",
         "ABAP",
         "ABC",
-        "Assembly",
+        "ASM",
         "ALGOL",
         "C",
         "Cxx",
